@@ -1,0 +1,415 @@
+---
+title: "correlational analysis"
+output: html_document
+date: "2023-06-12"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+load("UNM02_proc_data.RData")
+```
+
+The objective is to analyse if the performance in the training has a correlation with the performance in the test. In training, the variable that is going to be used as a measure of performance is the corrected accuracy or probable response. In test, we could relate it to the ratings (remember that we have 4 types of cues), but also to the accuracy to certain or uncertain cues.
+
+As in test we have both predictive and non-predictive cues it could be useful to create a measure that is only for certain vs uncertain cues.
+
+Let's first plot the data so it's handy.
+
+```{r, include=FALSE}
+data["prob_response"][data["prob_response"] == -99] <- NA
+data <- mutate(data, 
+               cue_type = case_when(cue1 == 1 | cue1 == 2 ~ "certain",
+  cue1 == 3 | cue1 == 4 ~ "uncertain"))
+MA_training <- data %>%
+  group_by(phase, cue_type, block) %>%
+  summarise(mean_accuracy = mean(prob_response, na.rm = TRUE), 
+            sd_accuracy = sd(prob_response, na.rm = TRUE)/sqrt(length(prob_response)))
+```
+
+```{r}
+ggplot(MA_training, mapping = aes(x = block, y = mean_accuracy, color = cue_type)) +
+  geom_point() +
+  geom_line() +
+  geom_errorbar(aes(x= block, y = mean_accuracy, ymin = mean_accuracy-sd_accuracy, ymax = mean_accuracy+sd_accuracy), color = "black", width=.1,position=position_dodge(0.05)) +
+  facet_grid(cols = vars(phase), space = "free_x", scales = "free_x") + 
+  scale_x_continuous(breaks = c(seq (1, 16, 1))) +
+  scale_y_continuous(name="Accuracy", limits=c(0.45, 1)) +
+  labs(title = "Figure 1", subtitle = "Mean corrected accuracy for the 16 block of the three phases of training")
+c_Mmem_test <- filter(test_data, acc == 1) %>%
+  group_by(cue_type) %>%
+  summarise(mean_mem_score = mean(mem_score, na.rm = TRUE), 
+           sd_mem_score = sd(mem_score, na.rm = TRUE)/sqrt(length(mem_score)))
+ggplot(data = c_Mmem_test) +
+  geom_col(mapping = aes(x = cue_type, y = mean_mem_score)) +
+  geom_errorbar(aes(x = cue_type, y= mean_mem_score, ymin = mean_mem_score - sd_mem_score, ymax = mean_mem_score + sd_mem_score)) +
+  coord_cartesian(ylim = c(0, 10))+
+  scale_x_discrete (name = "Type of cue") +
+  scale_y_continuous(name = "Positive memory score") +
+  labs(title = "Figure 2", subtitle = "Mean memory score for each type of cue in test phase for correct answers")
+
+```
+
+#Accuracy in test 
+##Overall
+
+```{r}
+#Overall analysis
+part_train_final_acc <- filter (data, block >= 15) %>%
+  group_by(pNum) %>%
+  summarise(acc = mean(prob_response, na.rm = TRUE))
+part_test_acc <- test_data %>%
+  group_by(pNum) %>%
+  summarise(test_acc = mean(acc, na.rm = TRUE))
+part_correlation_acc <- merge(part_train_final_acc, part_test_acc)
+part_acc <- ggplot()+
+  geom_point(part_correlation_acc, mapping = aes(x = acc, y = test_acc))
+print(part_acc)
+```
+
+```{r, include=FALSE}
+cor.test(part_correlation_acc$acc, part_correlation_acc$test_acc)
+```
+
+```{r, include=FALSE}
+correlationBF(part_correlation_acc$acc, part_correlation_acc$test_acc)
+```
+
+No significant correlation (r = 0.1891735, BF = 0.609037, p = 0.335)
+
+##Predictive cues
+
+```{r}
+train_final_acc <- filter (data, block >= 15) %>%
+  group_by(pNum, cue_type) %>%
+  summarise(acc = mean(prob_response, na.rm = TRUE))
+test_acc_p <- filter (test_data, cue_type == "C_P" | cue_type == "U_P") %>%
+  group_by(pNum, cue_type) %>%
+  summarise(test_acc = mean(acc, na.rm = TRUE))
+test_acc_p["cue_type"][test_acc_p["cue_type"] == "C_P"] <- "certain"
+test_acc_p["cue_type"][test_acc_p["cue_type"] == "U_P"] <- "uncertain"
+test_acc_np <- filter (test_data, cue_type == "C_NP" | cue_type == "U_NP") %>%
+  group_by(pNum, cue_type) %>%
+  summarise(test_acc = mean(acc, na.rm = TRUE))
+test_acc_np["cue_type"][test_acc_np["cue_type"] == "C_NP"] <- "certain"
+test_acc_np["cue_type"][test_acc_np["cue_type"] == "U_NP"] <- "uncertain"
+
+correlation_acc_p <- merge(train_final_acc, test_acc_p)
+correlation_acc_np <-  merge (train_final_acc, test_acc_np)
+predictive_acc <- ggplot()+
+  geom_point(correlation_acc_p, mapping = aes(x = acc, y = test_acc))+
+  facet_grid(~ cue_type)
+print(predictive_acc)
+```
+
+```{r, include=FALSE}
+cor.test(correlation_acc_p$acc, correlation_acc_p$test_acc)
+```
+
+```{r, include=FALSE}
+correlationBF(correlation_acc_p$acc, correlation_acc_p$test_acc)
+```
+
+No significant correlation (r = 0.215464, BF = 0.9630927, p = 0.1108).
+
+###Certain
+
+```{r}
+correlation_acc_p_certain <- filter(correlation_acc_p, cue_type == "certain")
+correlation_acc_p_uncertain <- filter(correlation_acc_p, cue_type == "uncertain")
+```
+
+```{r, include=FALSE}
+cor.test(correlation_acc_p_certain$acc, correlation_acc_p_certain$test_acc)
+```
+
+```{r, include=FALSE}
+correlationBF(correlation_acc_p_certain$acc, correlation_acc_p_certain$test_acc)
+```
+
+No significant correlation (r = 0.02955834 , BF = 0.4160671, p = 0.8813).
+
+###Uncertain
+
+```{r, include=FALSE}
+cor.test(correlation_acc_p_uncertain$acc, correlation_acc_p_uncertain$test_acc)
+```
+
+```{r, include=FALSE}
+correlationBF(correlation_acc_p_uncertain$acc, correlation_acc_p_uncertain$test_acc)
+```
+
+Significant correlation (r = 0.4607224, BF = 5.257627, p = 0.01361). The postive correlations indicates that the better the accuracy in training, the better the accuracy for uncertain predictive cues in test.
+
+##Non predicitive cues
+
+```{r}
+nonpredictive_acc <- ggplot()+
+  geom_point(correlation_acc_np, mapping = aes(x = acc, y = test_acc))+
+  facet_grid(~ cue_type)
+print(nonpredictive_acc)
+```
+
+```{r, include=FALSE}
+cor.test(correlation_acc_np$acc, correlation_acc_np$test_acc)
+```
+
+```{r, include=FALSE}
+correlationBF(correlation_acc_np$acc, correlation_acc_np$test_acc)
+```
+
+No significant correlation (r = -0.1046977, BF = 0.3953158, p = 0.4425)
+
+###Certain
+
+```{r}
+correlation_acc_np_certain <- filter(correlation_acc_np, cue_type == "certain")
+correlation_acc_np_uncertain <- filter(correlation_acc_np, cue_type == "uncertain")
+```
+
+```{r, include=FALSE}
+cor.test(correlation_acc_np_certain$acc, correlation_acc_np_certain$test_acc)
+```
+
+```{r, include=FALSE}
+correlationBF(correlation_acc_np_certain$acc, correlation_acc_np_certain$test_acc)
+```
+
+No significant correlation (r = 0.2012739, BF = 0.6419155, p = 0.3044).
+
+###Uncertain
+
+```{r, include=FALSE}
+cor.test(correlation_acc_np_uncertain$acc, correlation_acc_np_uncertain$test_acc)
+```
+
+```{r, include=FALSE}
+correlationBF(correlation_acc_np_uncertain$acc, correlation_acc_np_uncertain$test_acc)
+```
+
+Significant correlation (r = -0.4453315, BF = 4.363282, p = 0.01756). The negative correlation indicates that the better the accuracy in training, the worse the accuracy for uncertain non-predictive cues in test.
+
+#Memory score in test #Overall
+
+```{r}
+part_test_mem <- test_data %>%
+  group_by(pNum) %>%
+  summarise(test_mem = mean(mem_score, na.rm = TRUE))
+part_correlation_mem <- merge(part_train_final_acc, part_test_mem)
+part_mem <- ggplot()+
+  geom_point(part_correlation_mem, mapping = aes(x = acc, y = test_mem))
+print(part_mem)
+```
+
+```{r, include=FALSE}
+cor.test(part_correlation_mem$acc, part_correlation_mem$test_mem)
+```
+
+```{r, include=FALSE}
+correlationBF(part_correlation_mem$acc, part_correlation_mem$test_mem)
+```
+
+No significant correlation (r = 0.2079556, BF = 0.6618238, p = 0.2883)
+
+##Predicitive cues
+
+```{r, include=FALSE}
+test_mem_p <- filter (test_data, cue_type == "C_P" | cue_type == "U_P") %>%
+  group_by(pNum, cue_type) %>%
+  summarise(test_mem = mean(mem_score, na.rm = TRUE))
+test_mem_p["cue_type"][test_mem_p["cue_type"] == "C_P"] <- "certain"
+test_mem_p["cue_type"][test_mem_p["cue_type"] == "U_P"] <- "uncertain"
+test_mem_np <- filter (test_data, cue_type == "C_NP" | cue_type == "U_NP") %>%
+  group_by(pNum, cue_type) %>%
+  summarise(test_mem = mean(mem_score, na.rm = TRUE))
+test_mem_np["cue_type"][test_mem_np["cue_type"] == "C_NP"] <- "certain"
+test_mem_np["cue_type"][test_mem_np["cue_type"] == "U_NP"] <- "uncertain"
+
+correlation_mem_p <- merge(train_final_acc, test_mem_p)
+correlation_mem_np <-  merge (train_final_acc, test_mem_np)
+```
+
+```{r}
+predictive_mem <- ggplot()+
+  geom_point(correlation_mem_p, mapping = aes(x = acc, y = test_mem))+
+  facet_grid(~ cue_type)
+print(predictive_mem)
+```
+
+```{r, include=FALSE}
+cor.test(correlation_mem_p$acc, correlation_mem_p$test_mem)
+```
+
+```{r, include=FALSE}
+correlationBF(correlation_mem_p$acc, correlation_mem_p$test_mem)
+```
+
+Significant correlation (r = 0.3035929, BF = 3.191874, p = 0.02293). Positive correlation, so the best the accuracy in training, the higher the score in the memory test for predicitve cues.
+
+###Certain
+
+```{r}
+correlation_mem_p_certain <- filter(correlation_mem_p, cue_type == "certain")
+correlation_mem_p_uncertain <- filter(correlation_mem_p, cue_type == "uncertain")
+```
+
+```{r, include=FALSE}
+cor.test(correlation_mem_p_certain$acc, correlation_mem_p_certain$test_mem)
+```
+
+```{r, include=FALSE}
+correlationBF(correlation_mem_p_certain$acc, correlation_mem_p_certain$test_mem)
+```
+
+No significant correlation (r = 0.1657939 , BF = 0.5556392, p = 0.3991).
+
+###Uncertain
+
+```{r, include=FALSE}
+cor.test(correlation_mem_p_uncertain$acc, correlation_mem_p_uncertain$test_mem)
+```
+
+```{r, include=FALSE}
+correlationBF(correlation_mem_p_uncertain$acc, correlation_mem_p_uncertain$test_mem)
+```
+
+Significant correlation (r = 0.4521879 , BF = 4.735641, p = 0.0157). The postive correlation indicates that the better the accuracy in training, the bigger the memory score for uncertain predictive cues in test.
+
+##Non predictive memory score
+
+```{r}
+nonpredictive_mem <- ggplot()+
+  geom_point(correlation_mem_np, mapping = aes(x = acc, y = test_mem))+
+  facet_grid(~ cue_type)
+print(nonpredictive_mem)
+```
+
+```{r, include=FALSE}
+cor.test(correlation_mem_np$acc, correlation_mem_np$test_mem)
+```
+
+```{r, include=FALSE}
+correlationBF(correlation_mem_np$acc, correlation_mem_np$test_mem)
+```
+
+No significant correlation (r = -0.1565122, BF = 0.5532174, p = 0.2493)
+
+###Certain
+
+```{r}
+correlation_mem_np_certain <- filter(correlation_mem_np, cue_type == "certain")
+correlation_mem_np_uncertain <- filter(correlation_mem_np, cue_type == "uncertain")
+```
+
+```{r, include=FALSE}
+cor.test(correlation_mem_np_certain$acc, correlation_mem_np_certain$test_mem)
+```
+
+```{r, include=FALSE}
+correlationBF(correlation_mem_np_certain$acc, correlation_mem_np_certain$test_mem)
+```
+
+No significant correlation (r = 0.1539575, BF = 0.5330003, p = 0.4341).
+
+###Uncertain
+
+```{r, include=FALSE}
+cor.test(correlation_mem_np_uncertain$acc, correlation_mem_np_uncertain$test_mem)
+```
+
+```{r, include=FALSE}
+correlationBF(correlation_mem_np_uncertain$acc, correlation_mem_np_uncertain$test_mem)
+```
+
+Significant correlation (r = -0.4513673, BF = 4.688988, p = 0.01591). The negative correlation indicates that the better the accuracy in training, the worse the accuracy for uncertain non-predictive cues in test.
+
+#Analysis with a difference measure for memory score in test ##Overall
+
+Create a measure that stores the differences in responding to predictive and non-predictive cues for certain and uncertain, and correlate it with accuracy.
+
+```{r}
+test_mem_np <- test_mem_np %>% rename(np_test_mem = test_mem)
+test_mem_p <- test_mem_p %>% rename(p_test_mem = test_mem)
+diff_mem_score <- merge (test_mem_np, test_mem_p)
+diff_mem_score <- mutate(diff_mem_score, diff_test_mem = p_test_mem - np_test_mem)
+correlation_diff_mem <- merge(train_final_acc, diff_mem_score)
+diff_mem_mean <- correlation_diff_mem %>%
+  group_by(cue_type) %>%
+  summarise(mean_diff = mean(diff_test_mem, na.rm = TRUE))
+ggplot()+
+  geom_col(diff_mem_mean, mapping = aes(x = cue_type, y = mean_diff))
+```
+
+```{r}
+ggplot()+
+  geom_point(correlation_diff_mem, mapping = aes(x = acc, y = diff_test_mem))
+```
+
+```{r, include=FALSE}
+cor.test(correlation_diff_mem$acc, correlation_diff_mem$diff_test_mem)
+```
+
+```{r, include=FALSE}
+correlationBF(correlation_diff_mem$acc, correlation_diff_mem$diff_test_mem)
+```
+
+Significant correlation (r = 0.3762236, BF = 12.46399, p = 0.004267). Positive relation so the better the accuracy in training, the more positive the difference between predictive and non-predictive cues.
+
+##Certain cues
+
+```{r}
+correlation_diff_mem_certain <- filter(correlation_diff_mem, cue_type == "certain")
+correlation_diff_mem_uncertain <- filter(correlation_diff_mem, cue_type == "uncertain")
+```
+
+```{r}
+ggplot()+
+  geom_point(correlation_diff_mem_certain, mapping = aes(x = acc, y = diff_test_mem))
+```
+
+```{r, include=FALSE}
+cor.test(correlation_diff_mem_certain$acc, correlation_diff_mem_certain$diff_test_mem)
+```
+
+```{r, include=FALSE}
+correlationBF(correlation_diff_mem_certain$acc, correlation_diff_mem_certain$diff_test_mem)
+```
+
+No significant correlation (r = 0.01756703, BF = 0.4135527, p = 0.9293).
+
+##Uncertain cues
+
+```{r}
+ggplot()+
+  geom_point(correlation_diff_mem_uncertain, mapping = aes(x = acc, y = diff_test_mem))
+```
+
+```{r, include=FALSE}
+cor.test(correlation_diff_mem_uncertain$acc, correlation_diff_mem_uncertain$diff_test_mem)
+```
+
+```{r, include=FALSE}
+correlationBF(correlation_diff_mem_uncertain$acc, correlation_diff_mem_uncertain$diff_test_mem)
+```
+
+Significant correlation (r = 0.5784703 , BF = 31.41655, 0.001262). Positive relation so the better the accuracy in training, the more positive the difference between predictive and non-predictive cues.
+
+In all cases, there's always a significant correlation between accuracy in training and the different measures in test (accuracy, memory socre and difference score), as long as the cues were uncertain. It's worth noting that this relationship is positive if the cues were predictive, but negative when they were non-predictive.
+
+#Multiple regression 
+The proposed model is that test performance (accuracy, memory score and difference score) is predicted by the training accuracy and the type of cue. The formula would be: 
+$$
+test score = B_0 + B_1trainig accuracy + B_2cue type
+$$
+## Accuracy
+
+```{r, include=FALSE}
+test_acc <- test_data %>%
+  group_by(pNum, cue_type) %>%
+  summarise(test_acc = mean (acc, na.rm = TRUE))
+cor.test (test_acc$cue_type, test_acc$test_acc)
+
+```
+
+accuracy_model <- lm(sales ~ youtube + facebook + newspaper, data = marketing)
+summary(model)

@@ -1,0 +1,44 @@
+---
+title: "Untitled"
+output: html_document
+date: "2023-06-13"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(afex)
+library(BayesFactor)
+library(pwr)
+load("UNM02_proc_data.RData")
+```
+
+```{r}
+test_data <-  mutate(test_data, 
+               certainty = case_when(cue_type == "C_NP" | cue_type == "C_P" ~ "certain",
+                                    cue_type == "U_NP" | cue_type == "U_P" ~ "uncertain"),
+               predictiveness = case_when(cue_type == "U_P" | cue_type == "C_P" ~ "predictive",
+                                    cue_type == "U_NP" | cue_type == "C_NP" ~ "nonpreditive"))
+mem_mean_parti <- filter(test_data, acc == 1) %>%
+  group_by (pNum, certainty, predictiveness) %>%
+  summarise(mem_score = mean(mem_score, na.rm = TRUE))
+#now factorize the IV
+mem_mean_parti$pNum <- factor(mem_mean_parti$pNum)
+mem_mean_parti$certainty <- factor(mem_mean_parti$certainty)
+mem_mean_parti$predictiveness <- factor(mem_mean_parti$predictiveness)
+#ANOVA one between subjects factor (cue_type) on DV mem_score
+mem_score_test_ANOVA <- aov_car(formula = mem_score ~ Error(pNum/certainty*predictiveness), data = mem_mean_parti, anova_table = list(es = "pes"))
+print(mem_score_test_ANOVA)
+```
+Certainty: 
+Very low power (0.0789029). If we want to run it between subjects, with the partial eta square reported, a 0.8 power, 1 df in the numerator y 2 groups, the total sample size needed would be 1303. 
+
+Predictiveness:
+Even lower power (0.0545615).  If we want to run it between subjects, with the partial eta square reported, a 0.8 power, 1 df in the numerator y 2 groups, the total sample size needed would be 7843.
+
+Interaction:
+according to G*Power, the power is 0.9957627.
+So, if we want to run it between subjects, with the partial eta square reported, a 0.8 power, 1 df in the numerator y 2 groups, the total sample size needed would be 25. 
+This is a bit odd, because is less of what we have used. Not sure this is right.
+
+
