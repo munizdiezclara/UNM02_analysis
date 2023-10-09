@@ -98,7 +98,7 @@ ggplot(MA_training, mapping = aes(x = block_real, y = mean_accuracy, color = cue
   facet_grid(cols = vars(phase), space = "free_x", scales = "free_x") + 
   scale_x_continuous(breaks = c(seq (1, 16, 1))) +
   scale_y_continuous(name="Accuracy", limits=c(0.45, 1)) +
-  labs(title = "Mean corrected accuracy for the 16 block of the three phases of training")
+  labs(title = "Mean corrected accuracy in the three phases of training")
 ```
 
 ```{r, include = FALSE}
@@ -144,14 +144,14 @@ In the figure below, it can be seen that the memory score was very similar for a
 ```{r, include = FALSE}
 #prepare data
 Mmem_test <- test_data %>%
-  group_by(cue_type) %>%
+  group_by(cue_type, certainty) %>%
   summarise(mean_mem_score = mean(mem_score, na.rm = TRUE), 
             sd_mem_score = sd(mem_score, na.rm = TRUE)/sqrt(length(mem_score)))
 ```
 ```{r, echo = FALSE}
 #plot in a histogram
 ggplot(data = Mmem_test) +
-  geom_col(mapping = aes(x = cue_type, y = mean_mem_score)) +
+  geom_col(mapping = aes(x = cue_type, y = mean_mem_score, fill = certainty)) +
   geom_errorbar(aes(x = cue_type, y= mean_mem_score, ymin = mean_mem_score - sd_mem_score, ymax = mean_mem_score + sd_mem_score)) +
   coord_cartesian(ylim = c(0, 10))+
   scale_x_discrete (name = "Type of cue") +
@@ -188,18 +188,18 @@ The absence of differences was confirmed by the results of the ANOVA, that yield
 
 ```{r, include = FALSE}
 c_Mmem_test <- filter(test_data, acc == 1) %>%
-  group_by(cue_type) %>%
+  group_by(cue_type, certainty) %>%
   summarise(mean_mem_score = mean(mem_score, na.rm = TRUE), 
            sd_mem_score = sd(mem_score, na.rm = TRUE)/sqrt(length(mem_score)))
 ```
 ``` {r, echo = FALSE}
 ggplot(data = c_Mmem_test) +
-  geom_col(mapping = aes(x = cue_type, y = mean_mem_score)) +
+  geom_col(mapping = aes(x = cue_type, y = mean_mem_score, fill = certainty)) +
   geom_errorbar(aes(x = cue_type, y= mean_mem_score, ymin = mean_mem_score - sd_mem_score, ymax = mean_mem_score + sd_mem_score)) +
   coord_cartesian(ylim = c(0, 10))+
   scale_x_discrete (name = "Type of cue") +
   scale_y_continuous(name = "Positive memory score") +
-  labs(title = "Mean memory score for each type of cue in test phase for correct answers")
+  labs(title = "Mean corrected memory score for each type of cue in test")
 ```
 
 ```{r, include = FALSE}
@@ -231,11 +231,11 @@ With this measure, a significant effect of the interaction is found (`r apa(c_me
 ```{r, include=FALSE}
 #Analyse the mean accuracy for each type of cue, it might be interesting.
 acc_test <- test_data %>%
-  group_by(cue_type) %>%
+  group_by(cue_type, certainty) %>%
   summarise(mean_acc = mean(acc, na.rm = TRUE), 
            sd_acc = sd(acc, na.rm = TRUE)/sqrt(length(acc)))
 ggplot(data = acc_test) +
-  geom_col(mapping = aes(x = cue_type, y = mean_acc)) +
+  geom_col(mapping = aes(x = cue_type, y = mean_acc, fill = certainty)) +
   geom_errorbar(aes(x = cue_type, y= mean_acc, ymin = mean_acc - sd_acc, ymax = mean_acc + sd_acc)) +
   coord_cartesian(ylim = c(0, 1))+
   scale_x_discrete (name = "Type of cue") +
