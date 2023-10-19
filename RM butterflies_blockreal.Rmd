@@ -143,6 +143,11 @@ In the figure below, it can be seen that the memory score was very similar for a
 
 ```{r, include = FALSE}
 #prepare data
+test_data <-  mutate(test_data, 
+               certainty = case_when(cue_type == "C_NP" | cue_type == "C_P" ~ "certain",
+                                    cue_type == "U_NP" | cue_type == "U_P" ~ "uncertain"),
+               predictiveness = case_when(cue_type == "U_P" | cue_type == "C_P" ~ "predictive",
+                                    cue_type == "U_NP" | cue_type == "C_NP" ~ "nonpreditive"))
 Mmem_test <- test_data %>%
   group_by(cue_type, certainty) %>%
   summarise(mean_mem_score = mean(mem_score, na.rm = TRUE), 
@@ -161,11 +166,7 @@ ggplot(data = Mmem_test) +
 
 ```{r, include = FALSE}
 #The factors would be the type of cue and the participant, the DV being the memory score. Also, as there are various scores for each cue I would just make a mean for them. 
-test_data <-  mutate(test_data, 
-               certainty = case_when(cue_type == "C_NP" | cue_type == "C_P" ~ "certain",
-                                    cue_type == "U_NP" | cue_type == "U_P" ~ "uncertain"),
-               predictiveness = case_when(cue_type == "U_P" | cue_type == "C_P" ~ "predictive",
-                                    cue_type == "U_NP" | cue_type == "C_NP" ~ "nonpreditive"))
+
 mem_mean_parti <- test_data %>%
   group_by (pNum, certainty, predictiveness) %>%
   summarise(mem_score = mean(mem_score, na.rm = TRUE))
@@ -182,9 +183,53 @@ b_mem_score_ANOVA <- anovaBF(formula = mem_score ~ certainty*predictiveness + pN
 b_mem_score_ANOVA_int <-  b_mem_score_ANOVA[4] / b_mem_score_ANOVA[3]
 ```
 
-The absence of differences was confirmed by the results of the ANOVA, that yield no significant effect of the certainty or predictiveness the cue, neither their interaction (`r apa(mem_score_test_ANOVA, effect = "certainty")`, `r apa(mem_score_test_ANOVA, effect = "predictiveness")`, `r apa(mem_score_test_ANOVA, effect = "certainty:predictiveness")`, respectively). There was moderate evidence that the main effects were non significant (`r report_BF_and_error(b_mem_score_ANOVA[1])`, `r report_BF_and_error(b_mem_score_ANOVA[2])`), and anecdotal evidence that the interaction was non significant (`r report_BF_and_error(b_mem_score_ANOVA_int[1])`). This indicated that all the cues were remembered similarly.
+The absence of differences was confirmed by the results of the ANOVA, that yield no significant effect of the certainty or predictiveness the cue, neither their interaction (`r apa(mem_score_test_ANOVA, effect = "certainty")`, `r apa(mem_score_test_ANOVA, effect = "predictiveness")`, `r apa(mem_score_test_ANOVA, effect = "certainty:predictiveness")`, respectively). There was moderate evidence that the main effects and the interaction were non significant (`r report_BF_and_error(b_mem_score_ANOVA[1])`, `r report_BF_and_error(b_mem_score_ANOVA[2])`; `r report_BF_and_error(b_mem_score_ANOVA_int[1])`). This indicated that all the cues were remembered similarly.
 
-### Corrected memory score
+### Corrected memory score (hits x1, errors x0)
+```{r, include=FALSE}
+#create corrected memory score variable
+test_data <- test_data %>%
+  mutate(c_mem_score = case_when(acc == 1 ~ (1*mem_score), acc == 0 ~ (0*mem_score)), .after = mem_score)
+c_test_data <- test_data %>%
+  group_by(cue_type, certainty)%>%
+  summarise(mean_mem_score = mean(c_mem_score, na.rm = TRUE),
+            sd_mem_score = sd(c_mem_score, na.rm = TRUE)/sqrt(length(c_mem_score)))
+```
+``` {r, echo = FALSE}
+ggplot(data = c_test_data) +
+  geom_col(mapping = aes(x = cue_type, y = mean_mem_score, fill = certainty)) +
+  geom_errorbar(aes(x = cue_type, y= mean_mem_score, ymin = mean_mem_score - sd_mem_score, ymax = mean_mem_score + sd_mem_score)) +
+  coord_cartesian(ylim = c(0, 10))+
+  scale_x_discrete (name = "Type of cue") +
+  scale_y_continuous(name = "Positive memory score") +
+  labs(title = "Mean corrected memory score for each type of cue in test")
+```
+```{r, include = FALSE}
+#Analysis
+c_mem_mean <- test_data %>%
+  group_by (pNum, certainty, predictiveness) %>%
+  summarise(mem_score = mean(c_mem_score, na.rm = TRUE))
+#now factorize the IV
+c_mem_mean$pNum <- factor(c_mem_mean$pNum)
+c_mem_mean$certainty <- factor(c_mem_mean$certainty)
+c_mem_mean$predictiveness <- factor(c_mem_mean$predictiveness)
+#ANOVA one between subjects factor (cue_type) on DV mem_score
+c_mem_score_ANOVA <- aov_car(formula = mem_score ~ Error(pNum/certainty*predictiveness), data = c_mem_mean)
+print(c_mem_score_ANOVA)
+#bayes
+b_c_mem_score_ANOVA <- anovaBF(formula = mem_score ~ certainty*predictiveness + pNum,
+        data = data.frame(c_mem_mean),
+        whichRandom = "pNum")
+print(b_c_mem_score_ANOVA)
+# Calculate interaction Bayes Factor
+b_c_mem_score_ANOVA_int <- b_c_mem_score_ANOVA[4] / b_c_mem_score_ANOVA[3]
+print(b_c_mem_score_ANOVA_int)
+```
+
+
+The absence of differences was confirmed by the results of the ANOVA, that yield no significant effect of the certainty or predictiveness the cue, neither their interaction (`r apa(c_mem_score_ANOVA, effect = "certainty")`, `r apa(c_mem_score_ANOVA, effect = "predictiveness")`, `r apa(c_mem_score_ANOVA, effect = "certainty:predictiveness")`, respectively). There was moderate evidence that the main effects were non significant (`r report_BF_and_error(b_c_mem_score_ANOVA[1])`, `r report_BF_and_error(b_c_mem_score_ANOVA[2])`), and anecdotal evidence that the interaction was non significant (`r report_BF_and_error(b_c_mem_score_ANOVA_int[1])`). This indicated that all the cues were remembered similarly.
+
+### Corrected memory score (errors out)
 
 ```{r, include = FALSE}
 c_Mmem_test <- filter(test_data, acc == 1) %>%
@@ -228,7 +273,7 @@ b_c_mem_score_ANOVA_int <- b_c_mem_score_ANOVA[4] / b_c_mem_score_ANOVA[3]
 
 With this measure, a significant effect of the interaction is found (`r apa(c_mem_score_test_ANOVA, effect = "certainty:predictiveness")`)), with moderate bayesian evidence (`r report_BF_and_error(b_c_mem_score_ANOVA_int[1])`). Post hoc comparisons found that there was a significant difference between predictive and non-predictive cues when those were certain (*t*(27) = -0.729, *p* = 0.0149), but not when the cues were uncertain (*t*(27) = 0.688, *p* = 0.0913). Both the main effect of certainty and the main effect of predictiveness were non significant with moderate bayesian evidence (`r apa(c_mem_score_test_ANOVA, effect = "certainty")`, `r report_BF_and_error(b_c_mem_score_ANOVA[1])`; `r apa(c_mem_score_test_ANOVA, effect = "predictiveness")`, `r report_BF_and_error(b_c_mem_score_ANOVA[2])`).
 
-```{r, include=FALSE}
+```{r, echo=FALSE}
 #Analyse the mean accuracy for each type of cue, it might be interesting.
 acc_test <- test_data %>%
   group_by(cue_type, certainty) %>%
@@ -259,19 +304,23 @@ acc_parti$certainty <- factor(acc_parti$certainty)
 acc_parti$predictiveness <- factor(acc_parti$predictiveness)
 #ANOVA one between subjects factor (cue_type) on DV mem_score
 acc_ANOVA <- aov_car(formula = mean_acc ~ Error(pNum/certainty*predictiveness), data = acc_parti)
+print(acc_ANOVA)
 #interaction analysis
 #acc_interaction <- emmeans(c_mem_score_test_ANOVA, ~ predictiveness|certainty)
 #pairs(acc_parti_interaction, adjust = "bon")
 #acc_parti_interaction <- emmeans(c_mem_score_test_ANOVA, ~ certainty|predictiveness)
 #pairs(acc_parti_interaction, adjust = "bon")
 #bayes
-b_acc_parti_AVOVA <- anovaBF(formula = mean_acc ~ certainty*predictiveness + pNum,
+b_acc_ANOVA <- anovaBF(formula = mean_acc ~ certainty*predictiveness + pNum,
         data = data.frame(acc_parti),
         whichRandom = "pNum")
+print(b_acc_ANOVA)
 # Calculate interaction Bayes Factor
-b_acc_parti_AVOVA[4] / b_acc_parti_AVOVA[3]
+b_acc_ANOVA_int <- b_acc_ANOVA[4] / b_acc_ANOVA[3]
+print(b_acc_ANOVA_int)
 ```
-```{r}
+The absence of differences was confirmed by the results of the ANOVA, that yield no significant effect of the certainty or predictiveness the cue, neither their interaction (`r apa(acc_ANOVA, effect = "certainty")`, `r apa(acc_ANOVA, effect = "predictiveness")`, `r apa(acc_ANOVA, effect = "certainty:predictiveness")`, respectively). There was moderate evidence that the main effects and the interaction were non significant (`r report_BF_and_error(b_acc_ANOVA[1])`, `r report_BF_and_error(b_acc_ANOVA[2])`; `r report_BF_and_error(b_acc_ANOVA_int[1])`). This indicated that the accuracy of the recollection of each type of cue was similar.
+```{r, include = FALSE}
 #progression
 test_data <- mutate(test_data, 
                presentation = case_when(trial_number <= 8 ~ "first",

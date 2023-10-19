@@ -161,14 +161,19 @@ In the figure below, it can be seen that the memory score was very similar for a
 
 ```{r, echo = FALSE}
 #prepare data
+test_data <-  mutate(test_data, 
+               certainty = case_when(cue_type == "C_NP" | cue_type == "C_P" ~ "certain",
+                                    cue_type == "U_NP" | cue_type == "U_P" ~ "uncertain"),
+               predictiveness = case_when(cue_type == "U_P" | cue_type == "C_P" ~ "predictive",
+                                    cue_type == "U_NP" | cue_type == "C_NP" ~ "nonpreditive"))
 Mmem_test <- test_data %>%
-  group_by(cue_type) %>%
+  group_by(cue_type, certainty) %>%
   summarise(mean_mem_score = mean(mem_score, na.rm = TRUE), 
             sd_mem_score = sd(mem_score, na.rm = TRUE)/sqrt(length(mem_score)))
 
 #plot in a histogram
 ggplot(data = Mmem_test) +
-  geom_col(mapping = aes(x = cue_type, y = mean_mem_score)) +
+  geom_col(mapping = aes(x = cue_type, y = mean_mem_score, fill = certainty)) +
   geom_errorbar(aes(x = cue_type, y= mean_mem_score, ymin = mean_mem_score - sd_mem_score, ymax = mean_mem_score + sd_mem_score)) +
   coord_cartesian(ylim = c(4, 8))+
   scale_x_discrete (name = "Type of cue") +
@@ -178,11 +183,7 @@ ggplot(data = Mmem_test) +
 
 ```{r, include = FALSE}
 #The factors would be the type of cue and the participant, the DV being the memory score. Also, as there are various scores for each cue I would just make a mean for them. 
-test_data <-  mutate(test_data, 
-               certainty = case_when(cue_type == "C_NP" | cue_type == "C_P" ~ "certain",
-                                    cue_type == "U_NP" | cue_type == "U_P" ~ "uncertain"),
-               predictiveness = case_when(cue_type == "U_P" | cue_type == "C_P" ~ "predictive",
-                                    cue_type == "U_NP" | cue_type == "C_NP" ~ "nonpreditive"))
+
 mem_mean_parti <- test_data %>%
   group_by (pNum, certainty, predictiveness) %>%
   summarise(mem_score = mean(mem_score, na.rm = TRUE))
@@ -205,11 +206,11 @@ The absence of differences was confirmed by the results of the ANOVA, that yield
 Let's analyse only with the correct responses in the memory score.
 ```{r}
 c_Mmem_test <- filter(test_data, acc == 1) %>%
-  group_by(cue_type) %>%
+  group_by(cue_type, certainty) %>%
   summarise(mean_mem_score = mean(mem_score, na.rm = TRUE), 
            sd_mem_score = sd(mem_score, na.rm = TRUE)/sqrt(length(mem_score)))
 ggplot(data = c_Mmem_test) +
-  geom_col(mapping = aes(x = cue_type, y = mean_mem_score)) +
+  geom_col(mapping = aes(x = cue_type, y = mean_mem_score, fill = certainty)) +
   geom_errorbar(aes(x = cue_type, y= mean_mem_score, ymin = mean_mem_score - sd_mem_score, ymax = mean_mem_score + sd_mem_score)) +
   coord_cartesian(ylim = c(0, 10))+
   scale_x_discrete (name = "Type of cue") +
@@ -245,11 +246,11 @@ With this measure we get a significant effect of the interaction (p = .005), wit
 ```{r}
 #Analyse the mean accuracy for each type of cue, it might be interesting.
 acc_test <- test_data %>%
-  group_by(cue_type) %>%
+  group_by(cue_type, certainty) %>%
   summarise(mean_acc = mean(acc, na.rm = TRUE), 
            sd_acc = sd(acc, na.rm = TRUE)/sqrt(length(acc)))
 ggplot(data = acc_test) +
-  geom_col(mapping = aes(x = cue_type, y = mean_acc)) +
+  geom_col(mapping = aes(x = cue_type, y = mean_acc, fill = certainty)) +
   geom_errorbar(aes(x = cue_type, y= mean_acc, ymin = mean_acc - sd_acc, ymax = mean_acc + sd_acc)) +
   coord_cartesian(ylim = c(0, 1))+
   scale_x_discrete (name = "Type of cue") +
